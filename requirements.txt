@@ -1,0 +1,1 @@
+numpy>=1.24\npandas>=2.0\nscikit-learn>=1.3\nmatplotlib>=3.7\ntorch>=2.1\njoblib>=1.3\n
