@@ -27,6 +27,19 @@ def seed_everything():
     random.seed(SEED); np.random.seed(SEED); torch.manual_seed(SEED)
     if torch.cuda.is_available(): torch.cuda.manual_seed_all(SEED)
 
+def normalize_columns(cols):
+    """Strip spaces and repair the degree-sign encoding problem (e.g. 'Temperature(캜)')."""
+    out = []
+    for c in cols:
+        c = str(c).strip()
+        low = c.lower()
+        if low.startswith("dew point temperature"):
+            c = "Dew point temperature(°C)"
+        elif low.startswith("temperature"):
+            c = "Temperature(°C)"
+        out.append(c)
+    return out
+
 def load_data():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     if not ZIP_PATH.exists():
@@ -40,7 +53,7 @@ def load_data():
             try: df = pd.read_csv(f, encoding="utf-8")
             except UnicodeDecodeError:
                 f.seek(0); df = pd.read_csv(f, encoding="cp949")
-    df.columns = [str(c).strip() for c in df.columns]
+    df.columns = normalize_columns(df.columns)
     target = next((c for c in df.columns if c.lower()=="rented bike count"), None)
     date_col = next((c for c in df.columns if c.lower()=="date"), None)
     if target is None or date_col is None: raise ValueError(f"Unexpected columns: {df.columns.tolist()}")
@@ -50,8 +63,9 @@ def load_data():
     df["DayOfWeek"] = df[date_col].dt.dayofweek
     df["DayOfYear"] = df[date_col].dt.dayofyear
     df = df.sort_values(date_col).reset_index(drop=True)
-    features = [c for c in FEATURES if c in df.columns]
-    if len(features) < 5: raise ValueError(f"Too few features: {features}")
+    missing = [c for c in FEATURES if c not in df.columns]
+    if missing: raise ValueError(f"Missing expected features: {missing}; columns: {df.columns.tolist()}")
+    features = list(FEATURES)
     for c in features:
         if c not in CATS: df[c] = pd.to_numeric(df[c], errors="coerce")
     df[target] = pd.to_numeric(df[target], errors="coerce")
